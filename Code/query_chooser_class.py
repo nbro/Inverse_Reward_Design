@@ -1,7 +1,6 @@
 import csv
 import datetime
 import os
-import random
 import time
 from itertools import combinations
 from random import choice, sample
@@ -37,9 +36,9 @@ class Query_Chooser(object):
         self.t_0 = t_0
         self.model_cache = {}
 
-        config = tf.ConfigProto()
+        config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        self.sess = tf.compat.v1.Session(config=config)
 
     def cache_feature_expectations(self, reward_space=None):
         """Computes feature expectations for each proxy using TF and stores them in
@@ -330,7 +329,7 @@ class Query_Chooser(object):
                 # Set gradient steps and num_search
                 gd_steps_if_optim = self.args.num_iters_optim // 2
                 num_search_if_optim = self.args.num_iters_optim * (
-                        1 + self.no_optimize)  # GD steps take ca 2x as long as forward passes
+                            1 + self.no_optimize)  # GD steps take ca 2x as long as forward passes
                 # Optionally only optimize if at maximum query size
                 if self.args.only_optim_biggest:
                     if len(query) < max_query_size:
@@ -629,7 +628,7 @@ class Experiment(object):
 
         # Set run parameters
         inference = self.train_inferences[exp_num]
-        random.seed(self.seed)
+        seed(self.seed)
         self.seed += 1
         true_reward = self.true_rewards[exp_num]
 
@@ -749,7 +748,7 @@ class Experiment(object):
                     text = ' (post_regret)'
                 else:
                     text = ' (test_regret)'
-                print('Negative regret !!!!!!!')
+                print('Negative regret !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 print('regret: ' + str(regret) + text)
         return regrets.mean()
 
@@ -765,7 +764,7 @@ class Experiment(object):
         """Writes a CSV for every chooser for every experiment. The CSV's columns are 'iteration' and all measures in
         self.measures."""
         if not os.path.exists('data/' + self.folder_name):
-            os.mkdir('data/' + self.folder_name)
+            os.makedirs('data/' + self.folder_name)
         else:
             Warning('Existing experiment stats overwritten')
         for chooser in self.choosers:
@@ -796,7 +795,7 @@ class Experiment(object):
         Saves in the same folder as CSVs per experiment. Columns are 'iteration' and all measures in
         self.measures + self.cum_measures + ['time', 'time_query_chooser']."""
         if not os.path.exists('data/' + self.folder_name):
-            os.mkdir('data/' + self.folder_name)
+            os.makedirs('data/' + self.folder_name)
         else:
             Warning('Existing experiment stats overwritten')
 

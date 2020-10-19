@@ -1,22 +1,21 @@
-import numpy as np
 import random
-import tensorflow as tf
 import unittest
-from itertools import product
 
-from planner import GridworldModel, BanditsModel
+import numpy as np
+import tensorflow as tf
+from agents import ImmediateRewardAgent, OptimalAgent
+
 from gridworld import Direction
 from gridworld import GridworldMdp, GridworldMdpWithDistanceFeatures
 from gridworld import NStateMdpGaussianFeatures
-from agents import OptimalAgent, ImmediateRewardAgent
+from planner import BanditsModel, GridworldModel
 
 
 class TestPlanner(unittest.TestCase):
 
-
     def test_gridworld_planner(self):
         def check_model_equivalent(model, query, weights, mdp, num_iters):
-            with tf.Session() as sess:
+            with tf.compat.v1.Session() as sess:
                 sess.run(model.initialize_op)
                 (qvals,) = model.compute(
                     ['q_values'], sess, mdp, query, weight_inits=weights)
@@ -54,11 +53,9 @@ class TestPlanner(unittest.TestCase):
             8, 8, 25)
         check_model_equivalent(model, query, other_weights, mdp, 25)
 
-
-
     def test_bandits_planner(self):
         def check_model_equivalent(model, query, weights, mdp, num_iters):
-            with tf.Session() as sess:
+            with tf.compat.v1.Session() as sess:
                 sess.run(model.initialize_op)
                 (qvals,) = model.compute(['q_values'], sess, mdp, query, weight_inits=weights)
 
@@ -69,7 +66,7 @@ class TestPlanner(unittest.TestCase):
                 # for idx, val in zip(query, proxy):
                 #     mdp.rewards[idx] = val
                 agent.set_mdp(mdp)
-                check_qvals_equivalent(qvals[:,i], agent, mdp)
+                check_qvals_equivalent(qvals[:, i], agent, mdp)
 
         def check_qvals_equivalent(qvals, agent, mdp):
             for state in mdp.get_states():
@@ -91,8 +88,6 @@ class TestPlanner(unittest.TestCase):
         model = BanditsModel(
             dim, 0.9, len(query), 2, 1, None, 1, 1000, [], 0.1, False, True)
         check_model_equivalent(model, query, other_weights, mdp, 20)
-
-
 
 
 if __name__ == '__main__':

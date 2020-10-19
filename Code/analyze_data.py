@@ -381,7 +381,7 @@ def bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, oth
     filename = '{0}-vs-{1}-for-{2}-with-{3}.png'.format(
         ','.join(dependent_vars), x_var, ','.join(independent_vars), subtitle)
     if not os.path.exists(folder):
-        os.mkdir(folder)
+        os.makedirs(folder)
     # plt.show()
     plt.savefig(concat(folder, filename))
     plt.close()
@@ -492,7 +492,7 @@ def graph(exps, x_var, dependent_vars, independent_vars, controls,
     filename = '{0}-vs-{1}-for-{2}-with-{3}.png'.format(
         ','.join(dependent_vars), x_var, ','.join(independent_vars), subtitle)
     if not os.path.exists(folder):
-        os.mkdir(folder)
+        os.makedirs(folder)
     # plt.show()
     plt.savefig(concat(folder, filename))
     plt.close()

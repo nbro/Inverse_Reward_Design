@@ -1,12 +1,15 @@
+# External Libs
 import random
 from collections import defaultdict
 
 import numpy as np
 from scipy.stats import invwishart, multivariate_normal
 
+# Internal Libs
 from disjoint_sets import DisjointSets
 
 
+########################################################
 class Mdp(object):
     def __init__(self):
         pass
@@ -333,6 +336,113 @@ class GridworldMdp(Mdp):
         self.args = args
         # self.populate_rewards_and_start_state(grid)
 
+    @staticmethod
+    def generate_random(args, height, width, pr_wall, feature_dim, goals=None, living_reward=0, noise=0,
+                        print_grid=False, decorrelate=False):
+        """Generates a random instance of a Gridworld."""
+
+        # Does each goal\object type appear multiple times?
+        if args.repeated_obj:
+            num_goals = args.num_obj_if_repeated
+        else:
+            num_goals = feature_dim
+
+        def generate_goals(states):
+            goal_pos = np.random.choice(len(states), num_goals, replace=False)
+            # Place a 'proxy' goal/object which is in the same position as another goal everywher except once
+            if args.repeated_obj:
+                placed_proxy = False
+                placed_isolated_proxy = False
+                goals = []
+                for idx in goal_pos:
+                    objects = []
+                    x, y = states[idx]
+                    if not decorrelate:
+                        # For object number feature_dim-2, correlate it with object feature_dim with probability p_corr
+                        # feature_dim-2 is the proxy
+                        obj_type_1 = np.random.choice(feature_dim - 1)
+                        if obj_type_1 == feature_dim - 2:
+                            placed_proxy = True
+                            if placed_isolated_proxy:
+                                objects.append(feature_dim - 1)
+                            else:
+                                placed_isolated_proxy = True
+                    else:
+                        obj_type_1 = np.random.choice(feature_dim)
+                        placed_proxy = True
+                    objects.append(obj_type_1)
+                    goal = (x, y, objects)
+                    goals.append(goal)
+                if not placed_proxy:
+                    # Repeat if proxy not placed (low probability event)
+                    try:
+                        return generate_goals(states)
+                    except RuntimeError:
+                        raise ValueError('Number of goals lower than feature dim?')
+                return goals
+            # Generate goals the normal way
+            else:
+                goals = [states[i] for i in goal_pos]
+                for j, goal in enumerate(goals):
+                    goal = (goal[0], goal[1], [j])
+                    goals[j] = goal
+                return goals
+
+        def generate_start_and_goals(goals):
+            start_state = (width // 2, height // 2)
+            states = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
+            states.remove(start_state)
+            if goals is None:
+                goals = generate_goals(states)
+            return start_state, goals
+
+        (start_x, start_y), goals = generate_start_and_goals(goals)
+        goals_wo_type = [(x, y) for x, y, _ in list(goals)]
+        required_nonwalls = list(goals_wo_type)
+        required_nonwalls.append((start_x, start_y))
+
+        directions = [
+            Direction.NORTH,
+            Direction.SOUTH,
+            Direction.EAST,
+            Direction.WEST
+        ]
+
+        grid = [['X'] * width for _ in range(height)]
+        walls = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
+        dsets = DisjointSets([])
+        first_state = required_nonwalls[0]
+        for x, y, in required_nonwalls:
+            grid[y][x] = ' '
+            walls.remove((x, y))
+            dsets.add_singleton((x, y))
+            dsets.union((x, y), first_state)
+
+        min_free_spots = (1 - pr_wall) * len(walls)
+        random.shuffle(walls)
+        while dsets.get_num_elements() < min_free_spots or not dsets.is_connected():
+            x, y = walls.pop()
+            grid[y][x] = ' '
+            dsets.add_singleton((x, y))
+            for direction in directions:
+                newx, newy = Direction.move_in_direction((x, y), direction)
+                if dsets.contains((newx, newy)):
+                    dsets.union((x, y), (newx, newy))
+
+        grid[height // 2][width // 2] = 'A'
+        for x, y in goals_wo_type:
+            grid[y][x] = random.randint(-9, 10)
+
+        # Print grid
+        if print_grid:
+            for row in grid:
+                row_new = []
+                for place in row:
+                    place = str(place)
+                    row_new.append(place)
+                print(str(row_new))
+        return grid, goals
+
     def assert_valid_grid(self, grid):
         """Raises an AssertionError if the grid is invalid.
 
@@ -418,108 +528,6 @@ class GridworldMdp(Mdp):
         """
         walls = np.array(self.walls, dtype=int)
         return walls, self.feature_matrix, self.start_state
-
-    @staticmethod
-    def generate_random(args, height, width, pr_wall, feature_dim, goals=None, living_reward=0, noise=0,
-                        print_grid=False, decorrelate=False):
-        """Generates a random instance of a Gridworld."""
-
-        # Does each goal\object type appear multiple times?
-        if args.repeated_obj:
-            num_goals = args.num_obj_if_repeated
-        else:
-            num_goals = feature_dim
-
-        def generate_goals(states):
-            goal_pos = np.random.choice(len(states), num_goals, replace=False)
-            # Place a 'proxy' goal/object which is in the same position as another goal everywher except once
-            if args.repeated_obj:
-                placed_proxy = False
-                placed_isolated_proxy = False
-                goals = []
-                for idx in goal_pos:
-                    objects = []
-                    x, y = states[idx]
-                    if not decorrelate:
-                        # For object number feature_dim-2, correlate it with object feature_dim with probability p_corr
-                        # feature_dim-2 is the proxy
-                        obj_type_1 = np.random.choice(feature_dim - 1)
-                        if obj_type_1 == feature_dim - 2:
-                            placed_proxy = True
-                            if placed_isolated_proxy:
-                                objects.append(feature_dim - 1)
-                            else:
-                                placed_isolated_proxy = True
-                    else:
-                        obj_type_1 = np.random.choice(feature_dim)
-                        placed_proxy = True
-                    objects.append(obj_type_1)
-                    goal = (x, y, objects)
-                    goals.append(goal)
-                if not placed_proxy:
-                    # Repeat if proxy not placed (low probability event)
-                    try:
-                        return generate_goals(states)
-                    except RuntimeError:
-                        raise ValueError('Number of goals lower than feature dim?')
-                return goals
-            # Generate goals the normal way
-            else:
-                goals = [states[i] for i in goal_pos]
-                for j, goal in enumerate(goals):
-                    goal = (goal[0], goal[1], [j])
-                    goals[j] = goal
-                return goals
-
-        def generate_start_and_goals(goals):
-            start_state = (width // 2, height // 2)
-            states = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
-            states.remove(start_state)
-            if goals is None:
-                goals = generate_goals(states)
-            return start_state, goals
-
-        (start_x, start_y), goals = generate_start_and_goals(goals)
-        goals_wo_type = [(x, y) for x, y, _ in list(goals)]
-        required_nonwalls = list(goals_wo_type)
-        required_nonwalls.append((start_x, start_y))
-
-        directions = [
-            Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST]
-        grid = [['X'] * width for _ in range(height)]
-        walls = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
-        dsets = DisjointSets([])
-        first_state = required_nonwalls[0]
-        for x, y, in required_nonwalls:
-            grid[y][x] = ' '
-            walls.remove((x, y))
-            dsets.add_singleton((x, y))
-            dsets.union((x, y), first_state)
-
-        min_free_spots = (1 - pr_wall) * len(walls)
-        random.shuffle(walls)
-        while dsets.get_num_elements() < min_free_spots or not dsets.is_connected():
-            x, y = walls.pop()
-            grid[y][x] = ' '
-            dsets.add_singleton((x, y))
-            for direction in directions:
-                newx, newy = Direction.move_in_direction((x, y), direction)
-                if dsets.contains((newx, newy)):
-                    dsets.union((x, y), (newx, newy))
-
-        grid[height // 2][width // 2] = 'A'
-        for x, y in goals_wo_type:
-            grid[y][x] = random.randint(-9, 10)
-
-        # Print grid
-        if print_grid:
-            for row in grid:
-                row_new = []
-                for place in row:
-                    place = str(place)
-                    row_new.append(place)
-                print(str(row_new))
-        return grid, goals
 
     def get_start_state(self):
         """Returns the start state."""

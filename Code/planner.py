@@ -2,6 +2,8 @@ from itertools import product
 
 import tensorflow as tf
 
+tf.compat.v1.disable_eager_execution()  # needed until upgrade to save model instead of placeholder
+
 
 class Model(object):
     def __init__(self, feature_dim, gamma, query_size, discretization_size,
@@ -47,7 +49,7 @@ class Model(object):
         self.build_map_to_posterior()
         self.build_map_to_objective(objective)
         # Initializing the variables
-        self.initialize_op = tf.global_variables_initializer()
+        self.initialize_op = tf.compat.v1.global_variables_initializer()
 
     def build_weights(self):
         if self.discrete and self.optimize:
@@ -62,12 +64,12 @@ class Model(object):
         dim = self.feature_dim
         self.weights_to_train = tf.Variable(
             tf.zeros([N, dim]), name="weights_to_train")
-        self.weight_inputs = tf.placeholder(
+        self.weight_inputs = tf.compat.v1.placeholder(
             tf.float32, shape=[N, dim], name="weight_inputs")
         self.assign_op = self.weights_to_train.assign(self.weight_inputs)
 
         if N < K:
-            self.known_weights = tf.placeholder(
+            self.known_weights = tf.compat.v1.placeholder(
                 tf.float32, shape=[K - N, dim], name="known_weights")
             self.weights = tf.concat(
                 [self.known_weights, self.weights_to_train], axis=0, name="weights")
@@ -78,7 +80,7 @@ class Model(object):
         self.name_to_op['weights_to_train'] = self.weights_to_train
 
     def build_discrete_weights(self):
-        self.weights = tf.placeholder(
+        self.weights = tf.compat.v1.placeholder(
             tf.float32, shape=[self.K, self.feature_dim], name="weights")
 
     def build_continuous_weights(self):
@@ -91,7 +93,7 @@ class Model(object):
         weight_inits = tf.random_normal([num_fixed], stddev=2)
         self.weights_to_train = tf.Variable(
             weight_inits, name="weights_to_train")
-        self.weight_inputs = tf.placeholder(
+        self.weight_inputs = tf.compat.v1.placeholder(
             tf.float32, shape=[num_fixed], name="weight_inputs")
         self.assign_op = self.weights_to_train.assign(self.weight_inputs)
         self.fixed_weights = self.weights_to_train
@@ -111,7 +113,7 @@ class Model(object):
         # Then permute using gather to get the desired result.
         # The permutation can be computed from the query [1, 3] using
         # get_permutation_from_query.
-        self.permutation = tf.placeholder(tf.int32, shape=[dim])
+        self.permutation = tf.compat.v1.placeholder(tf.int32, shape=[dim])
         self.weights = tf.gather(unordered_weights, self.permutation, axis=-1)
 
         self.name_to_op['weights'] = self.weights
@@ -127,9 +129,9 @@ class Model(object):
         # Get log likelihoods for true reward matrix
         true_reward_space_size = self.true_reward_space_size
         dim = self.feature_dim
-        self.true_reward_matrix = tf.placeholder(
+        self.true_reward_matrix = tf.compat.v1.placeholder(
             tf.float32, [true_reward_space_size, dim], name="true_reward_matrix")
-        self.log_true_reward_matrix = tf.log(self.true_reward_matrix, name='log_true_reward_matrix')
+        self.log_true_reward_matrix = tf.compat.v1.log(self.true_reward_matrix, name='log_true_reward_matrix')
 
         # TODO: Inefficient to recompute this matrix on every forward pass.
         # We can cache it and feed in true reward indeces instead of true_reward_matrix. The matrix multiplication has
@@ -141,21 +143,21 @@ class Model(object):
         log_likelihoods_new = self.beta * self.avg_reward_matrix
 
         # Calculate posterior
-        # self.prior = tf.placeholder(tf.float32, name="prior", shape=(true_reward_space_size))
-        self.log_prior = tf.placeholder(tf.float32, name="log_prior", shape=(true_reward_space_size))
+        # self.prior = tf.compat.v1.placeholder(tf.float32, name="prior", shape=(true_reward_space_size))
+        self.log_prior = tf.compat.v1.placeholder(tf.float32, name="log_prior", shape=(true_reward_space_size))
         log_Z_w = tf.reduce_logsumexp(log_likelihoods_new, axis=0, name='log_Z_w')
         log_P_q_z = log_likelihoods_new - log_Z_w  # broadcasting
-        # self.log_Z_q, max_a, max_b = logdot(log_P_q_z, tf.log(self.prior))
-        self.log_Z_q = tf.reduce_logsumexp(log_P_q_z + self.log_prior, axis=1, name='log_Z_q', keep_dims=True)
+        # self.log_Z_q, max_a, max_b = logdot(log_P_q_z, tf.compat.v1.log(self.prior))
+        self.log_Z_q = tf.reduce_logsumexp(log_P_q_z + self.log_prior, axis=1, name='log_Z_q', keepdims=True)
         # TODO: For BALD objective, just take entropy of Z_q - prior expected entropy of q
-        # self.log_posterior = log_P_q_z + tf.log(self.prior) - self.log_Z_q
+        # self.log_posterior = log_P_q_z + tf.compat.v1.log(self.prior) - self.log_Z_q
         self.log_posterior = log_P_q_z + self.log_prior - self.log_Z_q  # 2x broadcasting
         self.posterior = tf.exp(self.log_posterior, name="posterior")
 
         self.post_sum_to_1 = tf.reduce_sum(tf.exp(self.log_posterior), axis=1, name='post_sum_to_1')
 
         # Get log likelihoods for actual true reward
-        self.true_reward = tf.placeholder(
+        self.true_reward = tf.compat.v1.placeholder(
             tf.float32, shape=[dim], name="true_reward")
         self.true_reward_tensor = tf.expand_dims(
             self.true_reward, axis=0, name="true_reward_tensor")
@@ -174,7 +176,7 @@ class Model(object):
 
         # # Sample answer
         self.log_true_answer_probs = tf.reshape(self.log_true_answer_probs, shape=[1, -1])
-        sample = tf.multinomial(self.log_true_answer_probs, num_samples=1)
+        sample = tf.compat.v1.multinomial(self.log_true_answer_probs, num_samples=1)
         sample = sample[0][0]
         self.true_log_posterior = self.log_posterior[sample]
         self.true_posterior = self.posterior[sample]
@@ -186,20 +188,20 @@ class Model(object):
 
         # Get true posterior entropy
         scaled_log_true_posterior = self.true_log_posterior - 0.0001
-        interm_tensor = scaled_log_true_posterior + tf.log(- scaled_log_true_posterior)
+        interm_tensor = scaled_log_true_posterior + tf.compat.v1.log(- scaled_log_true_posterior)
         self.true_ent = tf.exp(tf.reduce_logsumexp(
-            interm_tensor, axis=0, name="true_entropy", keep_dims=True))
+            interm_tensor, axis=0, name="true_entropy", keepdims=True))
         self.name_to_op['true_entropy'] = self.true_ent
 
         # Get true posterior_avg
         ## Not in log space
         self.post_weighted_true_reward_matrix = tf.multiply(self.true_posterior, tf.transpose(self.true_reward_matrix))
         self.true_post_avg = tf.reduce_sum(self.post_weighted_true_reward_matrix, axis=1, name='post_avg',
-                                           keep_dims=False)
+                                           keepdims=False)
 
         ## In log space (necessary?)
         # log_true_posterior_times_true_reward = self.true_log_posterior + tf.transpose(self.log_true_reward_matrix) # TODO: log true posteriors are log of negative
-        # self.log_post_avg = tf.reduce_logsumexp(log_true_posterior_times_true_reward, axis=1, keep_dims=False)
+        # self.log_post_avg = tf.reduce_logsumexp(log_true_posterior_times_true_reward, axis=1, keepdims=False)
         # self.name_to_op['log_post_avg'] = self.log_post_avg
         # self.post_avg = tf.exp(self.log_post_avg, name='post_avg')
 
@@ -220,20 +222,20 @@ class Model(object):
         if 'entropy' == objective:
             # # Calculate exp entropy without log space trick
             # post_ent = - tf.reduce_sum(
-            #     tf.multiply(tf.exp(self.log_posterior), self.log_posterior), axis=1, keep_dims=True, name='post_ent')
+            #     tf.multiply(tf.exp(self.log_posterior), self.log_posterior), axis=1, keepdims=True, name='post_ent')
             # self.exp_post_ent = tf.reduce_sum(
-            #     tf.multiply(post_ent, tf.exp(self.log_Z_q)), axis=0, keep_dims=True, name='exp_post_entropy')
+            #     tf.multiply(post_ent, tf.exp(self.log_Z_q)), axis=0, keepdims=True, name='exp_post_entropy')
             # self.name_to_op['entropy'] = self.exp_post_ent
 
             # Calculate entropy as exp logsumexp (log p + log (-log p))
             scaled_log_posterior = self.log_posterior - 0.0001
-            interm_tensor = scaled_log_posterior + tf.log(- scaled_log_posterior)
+            interm_tensor = scaled_log_posterior + tf.compat.v1.log(- scaled_log_posterior)
             self.log_post_ent_new = tf.reduce_logsumexp(
-                interm_tensor, axis=1, name="log_entropy_per_answer", keep_dims=True)
+                interm_tensor, axis=1, name="log_entropy_per_answer", keepdims=True)
             self.post_ent_new = tf.exp(self.log_post_ent_new)
             self.name_to_op['entropy_per_answer'] = self.post_ent_new
             self.log_exp_post_ent = tf.reduce_logsumexp(
-                self.log_post_ent_new + self.log_Z_q, axis=0, keep_dims=True, name='log_entropy')
+                self.log_post_ent_new + self.log_Z_q, axis=0, keepdims=True, name='log_entropy')
             self.exp_post_ent = tf.exp(self.log_exp_post_ent)
             self.name_to_op['entropy'] = self.exp_post_ent
 
@@ -244,9 +246,9 @@ class Model(object):
 
         if 'query_neg_entropy' == objective:
             scaled_log_answer_probs = self.log_Z_q - 0.0001
-            interm_tensor = scaled_log_answer_probs + tf.log(- scaled_log_answer_probs)
+            interm_tensor = scaled_log_answer_probs + tf.compat.v1.log(- scaled_log_answer_probs)
             self.log_query_entropy = tf.reduce_logsumexp(
-                interm_tensor, axis=-2, name='log_query_entropy', keep_dims=True)
+                interm_tensor, axis=-2, name='log_query_entropy', keepdims=True)
 
             self.query_entropy = tf.exp(self.log_query_entropy, name='query_entropy')
             self.name_to_op['log_query_entropy'] = self.log_query_entropy
@@ -261,10 +263,10 @@ class Model(object):
 
             self.post_averages, self.post_var = tf.nn.weighted_moments(
                 self.true_reward_matrix, [1, 1], tf.stack([self.posterior] * self.feature_dim, axis=2),
-                name="moments", keep_dims=False)
+                name="moments", keepdims=False)
             self.name_to_op['post_var'] = self.post_var
 
-            self.total_variations = tf.reduce_sum(self.post_var, axis=-1, keep_dims=False)
+            self.total_variations = tf.reduce_sum(self.post_var, axis=-1, keepdims=False)
             self.name_to_op['total_variations'] = self.total_variations
             self.total_variations, self.log_Z_q = tf.reshape(self.total_variations, [-1]), tf.reshape(self.log_Z_q,
                                                                                                       [-1])
@@ -274,7 +276,7 @@ class Model(object):
             self.name_to_op['total_variation'] = self.total_variation
 
             if self.args.log_objective:
-                self.objective = tf.log(self.total_variation)
+                self.objective = tf.compat.v1.log(self.total_variation)
             else:
                 self.objective = self.total_variation
 
@@ -301,7 +303,7 @@ class Model(object):
         specified in outputs and returns them.
 
         :param outputs: List of strings, each specifying a value to compute.
-        :param sess: tf.Session() object.
+        :param sess: tf.compat.v1.Session() object.
         :param mdp: The MDP whose true reward function we want to identify.
         :param query: List of features (integers) to ask the user to set.
         :param weight_inits: Initialization for the non-query features.
@@ -375,14 +377,14 @@ class Model(object):
 class BanditsModel(Model):
 
     def build_planner(self):
-        self.features = tf.placeholder(
+        self.features = tf.compat.v1.placeholder(
             tf.float32, name="features", shape=[None, self.feature_dim])
         self.name_to_op['features'] = self.features
 
         # Calculate state probabilities
         weights_expand = tf.expand_dims(self.weights, axis=1)
         intermediate_tensor = tf.multiply(tf.stack([self.features] * self.K, axis=0), weights_expand)
-        self.reward_per_state = tf.reduce_sum(intermediate_tensor, axis=-1, keep_dims=False, name="rewards_per_state")
+        self.reward_per_state = tf.reduce_sum(intermediate_tensor, axis=-1, keepdims=False, name="rewards_per_state")
         self.name_to_op['reward_per_state'] = self.reward_per_state
         self.name_to_op['q_values'] = self.reward_per_state
 
@@ -393,7 +395,7 @@ class BanditsModel(Model):
             self.state_probs = tf.one_hot(self.best_state, self.num_states)
         # Boltzmann rational planner
         else:
-            self.state_probs = tf.nn.softmax(self.beta_planner * self.reward_per_state, dim=-1, name="state_probs")
+            self.state_probs = tf.nn.softmax(self.beta_planner * self.reward_per_state, name="state_probs")
 
         self.name_to_op['state_probs'] = self.state_probs
         self.name_to_op['state_probs_cut'] = self.state_probs[:5]
@@ -402,7 +404,7 @@ class BanditsModel(Model):
         # Calculate feature expectations
         probs_stack = tf.stack([self.state_probs] * self.feature_dim, axis=2)
         features_stack = tf.multiply(tf.stack([self.features] * self.K, axis=0), probs_stack, name='multi')
-        self.feature_expectations = tf.reduce_sum(features_stack, axis=1, keep_dims=False, name="feature_exps")
+        self.feature_expectations = tf.reduce_sum(features_stack, axis=1, keepdims=False, name="feature_exps")
         self.name_to_op['feature_exps'] = self.feature_expectations
 
     def update_feed_dict_with_mdp(self, mdp, fd):
@@ -426,12 +428,12 @@ class GridworldModel(Model):
         height, width, dim = self.height, self.width, self.feature_dim
         num_actions, K = self.num_actions, self.K
 
-        self.image = tf.placeholder(
+        self.image = tf.compat.v1.placeholder(
             tf.float32, name="image", shape=[height, width])
-        self.features = tf.placeholder(
+        self.features = tf.compat.v1.placeholder(
             tf.float32, name="features", shape=[height, width, dim])
-        self.start_x = tf.placeholder(tf.int32, name="start_x", shape=[])
-        self.start_y = tf.placeholder(tf.int32, name="start_y", shape=[])
+        self.start_x = tf.compat.v1.placeholder(tf.int32, name="start_x", shape=[])
+        self.start_y = tf.compat.v1.placeholder(tf.int32, name="start_y", shape=[])
 
         features_wall = tf.concat(
             [self.features, tf.expand_dims(self.image, -1)], axis=-1)
@@ -453,7 +455,7 @@ class GridworldModel(Model):
                 best_actions = tf.argmax(q_values, axis=-1)
                 policy = tf.one_hot(best_actions[0], 4)
             else:
-                policy = tf.nn.softmax(self.beta_planner * q_values, dim=-1)
+                policy = tf.nn.softmax(self.beta_planner * q_values)
             repeated_policy = tf.stack([policy] * dim, axis=-2)
             feature_expectations = tf.reduce_sum(
                 tf.multiply(repeated_policy, q_fes), axis=-1)
@@ -504,7 +506,7 @@ class NoPlanningModel(Model):
         pass
 
     def build_planner(self):
-        self.feature_expectations = tf.placeholder(
+        self.feature_expectations = tf.compat.v1.placeholder(
             tf.float32, shape=[self.K, self.feature_dim], name='feature_exps')
         self.name_to_op['feature_exps'] = self.feature_expectations
 
