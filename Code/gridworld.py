@@ -1,9 +1,10 @@
-from collections import defaultdict
-from disjoint_sets import DisjointSets
-import numpy as np
 import random
-import itertools 
+from collections import defaultdict
+
+import numpy as np
 from scipy.stats import invwishart, multivariate_normal
+
+from disjoint_sets import DisjointSets
 
 
 class Mdp(object):
@@ -13,7 +14,6 @@ class Mdp(object):
     def get_start_state(self):
         """Returns the start state."""
         raise NotImplementedError
-
 
     def get_states(self):
         """Returns a list of all possible states the agent can be in.
@@ -31,7 +31,7 @@ class Mdp(object):
         """
         raise NotImplementedError
 
-    def get_features(self,state):
+    def get_features(self, state):
         """Returns feature vector for state"""
         return self.features[state]
 
@@ -75,17 +75,17 @@ class Mdp(object):
         raise NotImplemented
 
 
-
 class NStateMdp(Mdp):
     '''An MDP with N=num_states states and N actions which are always possible.
     Action i leads to state i.
     preterminal_states transition to a generic terminal state via a terminal action.
     '''
-    def __init__(self,num_states, rewards, start_state, preterminal_states):
-        super(NStateMdp,self).__init__()
-        self.num_states = num_states    # Or make a grid and add n actions
+
+    def __init__(self, num_states, rewards, start_state, preterminal_states):
+        super(NStateMdp, self).__init__()
+        self.num_states = num_states  # Or make a grid and add n actions
         self.terminal_state = 'Terminal State'
-        self.preterminal_states = preterminal_states    # Preterminal states should include states with no available actions. Otherwise get_actions==>[]==>
+        self.preterminal_states = preterminal_states  # Preterminal states should include states with no available actions. Otherwise get_actions==>[]==>
         # self.populate_rewards_and_start_state(rewards)
         self.start_state = start_state
         self.rewards = np.array(rewards)
@@ -110,14 +110,15 @@ class NStateMdp(Mdp):
         act = range(self.num_states)
         return act
 
-    def get_reward(self,state,action):
+    def get_reward(self, state, action):
         """Get reward for state, action transition."""
         features = self.get_features(state)
         return self.get_reward_from_features(features)
 
     def change_reward(self, rewards):
         '''Sets new reward function (for reward design).'''
-        try: assert self.rewards.shape == rewards.shape
+        try:
+            assert self.rewards.shape == rewards.shape
         except:
             pass
         self.rewards = rewards
@@ -156,15 +157,12 @@ class NStateMdp(Mdp):
         """Return the new state an agent would be in if it took the action."""
         assert type(action) == int
         new_state = action
-        return new_state   # new state is action
-
-
-
+        return new_state  # new state is action
 
 
 ########################################################
 class NStateMdpHardcodedFeatures(NStateMdp):
-    def get_features(self,state):
+    def get_features(self, state):
         """Outputs np array of features - a one-hot encoding of the state.
         """
         # features = np.zeros(self.num_states)
@@ -172,18 +170,16 @@ class NStateMdpHardcodedFeatures(NStateMdp):
         features = np.zeros(2)
         if state == 0:
             features[0] = 1
-        elif state == 1 and self.num_states == 3:   # if three states (test env), cut out state 1
+        elif state == 1 and self.num_states == 3:  # if three states (test env), cut out state 1
             pass
         elif state == 1 and self.num_states == 2:
-            features[1] = 1; features[0] = 1
+            features[1] = 1;
+            features[0] = 1
         elif state == 2:
             features[1] = 1
         else:
             raise ValueError('should only have three states for this featurization')
         return features
-
-
-
 
 
 ########################################################
@@ -195,6 +191,7 @@ class NStateMdpGaussianFeatures(NStateMdp):
     -num_states_reachable: Integer k <= N which we may change between training and test MDP.
     -SEED
     """
+
     def __init__(self, num_states, rewards, start_state, preterminal_states, feature_dim, num_states_reachable, SEED=1):
         self.SEED = SEED
         super(NStateMdpGaussianFeatures, self).__init__(num_states, rewards, start_state, preterminal_states)
@@ -214,9 +211,9 @@ class NStateMdpGaussianFeatures(NStateMdp):
         cov = np.eye(self.feature_dim)
         self.feature_matrix = np.zeros([self.num_states, self.feature_dim])
         for state in self.get_states():
-            features = multivariate_normal.rvs(mean=mean,cov=cov,size=1)
+            features = multivariate_normal.rvs(mean=mean, cov=cov, size=1)
             self.features[state] = features
-            self.feature_matrix[state,:] = np.array(features)
+            self.feature_matrix[state, :] = np.array(features)
 
     def get_features(self, state):
         return self.features[state]
@@ -226,7 +223,7 @@ class NStateMdpGaussianFeatures(NStateMdp):
         actions = super(NStateMdpGaussianFeatures, self).get_actions(state)
         if Direction.EXIT in actions:
             return actions
-        else:   # TODO: Why only two actions in debugger when there could be 3?
+        else:  # TODO: Why only two actions in debugger when there could be 3?
             return actions[:self.num_states_reachable]
 
     def add_feature_map(self, feature_dict):
@@ -239,6 +236,7 @@ class NStateMdpGaussianFeatures(NStateMdp):
         """Encodes this MDP in a format well-suited for deep models."""
         return self.feature_matrix
 
+
 class NStateMdpRandomGaussianFeatures(NStateMdp):
     """
     Features for each state are drawn from a different Gaussian for each state. The map: state \mapsto features is stochastic.
@@ -247,12 +245,13 @@ class NStateMdpRandomGaussianFeatures(NStateMdp):
     -num_states_reachable: Integer k <= N which we may change between training and test MDP.
     -SEED
     """
+
     def __init__(self, num_states, rewards, start_state, preterminal_states, feature_dim, num_states_reachable, SEED=1):
         # Superclass init:
         # super(NStateMdp, self).__init__(num_states, rewards, start_state, preterminal_states)
         self.num_states = num_states
         self.terminal_state = 'Terminal State'
-        self.preterminal_states = preterminal_states    # Preterminal states should include states with no available actions. Otherwise get_actions==>[]==>
+        self.preterminal_states = preterminal_states  # Preterminal states should include states with no available actions. Otherwise get_actions==>[]==>
         self.start_state = start_state
         self.rewards = np.array(rewards)
         # Additional for this class
@@ -276,9 +275,7 @@ class NStateMdpRandomGaussianFeatures(NStateMdp):
             mean = multivariate_normal.rvs(mean=mean_hyperprior, cov=cov_hyperprior)
             cov = invwishart.rvs(df=self.feature_dim, scale=np.ones(self.feature_dim), size=1)
             self.feature_params[state] = (mean, cov)
-            self.feature_matrix_mean[state,:] = np.array(mean)
-
-
+            self.feature_matrix_mean[state, :] = np.array(mean)
 
     def get_features(self, state):
         """Draws features(state) from the Gaussian corresponding to the state."""
@@ -295,7 +292,6 @@ class NStateMdpRandomGaussianFeatures(NStateMdp):
     def convert_to_numpy_input(self):
         """Encodes this MDP in a format well-suited for deep models."""
         return self.feature_matrix_mean
-
 
 
 ########################################################
@@ -337,7 +333,6 @@ class GridworldMdp(Mdp):
         self.args = args
         # self.populate_rewards_and_start_state(grid)
 
-
     def assert_valid_grid(self, grid):
         """Raises an AssertionError if the grid is invalid.
 
@@ -376,7 +371,8 @@ class GridworldMdp(Mdp):
             return element in ['X', ' ', 'A'] or is_float(element)
 
         all_elements = [element for row in grid for element in row]
-        assert all(is_valid_element(element) for element in all_elements), 'Invalid element: must be X, A, blank space, or a number'
+        assert all(is_valid_element(element) for element in
+                   all_elements), 'Invalid element: must be X, A, blank space, or a number'
         assert all_elements.count('A') == 1, "'A' must be present exactly once"
         floats = [element for element in all_elements if is_float(element)]
         assert len(floats) >= 1, 'There must at least one reward square'
@@ -424,7 +420,8 @@ class GridworldMdp(Mdp):
         return walls, self.feature_matrix, self.start_state
 
     @staticmethod
-    def generate_random(args, height, width, pr_wall, feature_dim, goals=None, living_reward=0, noise=0, print_grid=False, decorrelate=False):
+    def generate_random(args, height, width, pr_wall, feature_dim, goals=None, living_reward=0, noise=0,
+                        print_grid=False, decorrelate=False):
         """Generates a random instance of a Gridworld."""
 
         # Does each goal\object type appear multiple times?
@@ -450,7 +447,7 @@ class GridworldMdp(Mdp):
                         if obj_type_1 == feature_dim - 2:
                             placed_proxy = True
                             if placed_isolated_proxy:
-                                objects.append(feature_dim-1)
+                                objects.append(feature_dim - 1)
                             else:
                                 placed_isolated_proxy = True
                     else:
@@ -476,7 +473,7 @@ class GridworldMdp(Mdp):
 
         def generate_start_and_goals(goals):
             start_state = (width // 2, height // 2)
-            states = [(x, y) for x in range(1, width-1) for y in range(1, height-1)]
+            states = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
             states.remove(start_state)
             if goals is None:
                 goals = generate_goals(states)
@@ -490,7 +487,7 @@ class GridworldMdp(Mdp):
         directions = [
             Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST]
         grid = [['X'] * width for _ in range(height)]
-        walls = [(x, y) for x in range(1, width-1) for y in range(1, height-1)]
+        walls = [(x, y) for x in range(1, width - 1) for y in range(1, height - 1)]
         dsets = DisjointSets([])
         first_state = required_nonwalls[0]
         for x, y, in required_nonwalls:
@@ -521,7 +518,7 @@ class GridworldMdp(Mdp):
                 for place in row:
                     place = str(place)
                     row_new.append(place)
-                print str(row_new)
+                print(str(row_new))
         return grid, goals
 
     def get_start_state(self):
@@ -569,7 +566,6 @@ class GridworldMdp(Mdp):
         if state in self.rewards and action == Direction.EXIT:
             return self.rewards[state]
         return self.living_reward
-
 
     def is_terminal(self, state):
         """Returns True if the current state is terminal, False otherwise.
@@ -623,6 +619,7 @@ class GridworldMdp(Mdp):
         -9 cannot be represented with a single character. Such rewards are
         encoded as 'R' (if positive) or 'N' (if negative).
         """
+
         def get_char(x, y):
             if self.walls[y][x]:
                 return 'X'
@@ -644,20 +641,20 @@ class GridworldMdp(Mdp):
         return '\n'.join([get_row_str(y) for y in range(self.height)])
 
 
-
 class GridworldMdpWithFeatures(GridworldMdp):
     """
     Same as GridWorldMdp, but there is a feature map and the reward is a linear function of the features.
     """
+
     def __init__(self, grid, args, living_reward=-0.01, noise=0):
         super(GridworldMdpWithFeatures, self).__init__(grid, args, living_reward, noise)
         self.grid = grid
         self.populate_features()
 
-    def get_features(self,state):
+    def get_features(self, state):
         """Returns feature vector for state"""
         x, y = state
-        return self.feature_matrix[y,x,:]
+        return self.feature_matrix[y, x, :]
 
     def populate_features(self):
         raise NotImplementedError
@@ -666,8 +663,10 @@ class GridworldMdpWithFeatures(GridworldMdp):
         features = self.get_features(state)
         return np.dot(features, self.rewards)
 
+
 class GridworldMdpWithDistanceFeatures(GridworldMdpWithFeatures):
     """Features are based on distance to places with reward."""
+
     def __init__(self, grid, goals, args, dist_scale=0.5, living_reward=-0.01, noise=0, rewards=None):
         self.dist_scale = dist_scale
         self.goals = goals
@@ -703,15 +702,14 @@ class GridworldMdpWithDistanceFeatures(GridworldMdpWithFeatures):
                 if self.grid[y][x] == 'A':
                     self.start_state = (x, y)
 
-
         height, width = len(self.grid), len(self.grid[0])
         self.feature_matrix = np.zeros([height, width, self.args.feature_dim])
         # Save features for each state based on distance to goals
-        for y in range(1,height-1):
-            for x in range(1,width-1):
+        for y in range(1, height - 1):
+            for x in range(1, width - 1):
                 features = np.zeros(self.args.feature_dim)
-                for i,j,obj_nums in self.goals:
-                    distance = np.linalg.norm(np.array((x,y)) - np.array((i,j)))
+                for i, j, obj_nums in self.goals:
+                    distance = np.linalg.norm(np.array((x, y)) - np.array((i, j)))
                     rbf_nearness = np.exp(- self.dist_scale * distance)
                     feat_value = -distance / 5. if self.linear_features and not self.args.repeated_obj \
                         else rbf_nearness
@@ -720,8 +718,7 @@ class GridworldMdpWithDistanceFeatures(GridworldMdpWithFeatures):
                     for obj_num in obj_nums:
                         features[obj_num] += feat_value
 
-                self.feature_matrix[y,x,:] = features
-
+                self.feature_matrix[y, x, :] = features
 
 
 class GridworldEnvironment(object):
@@ -771,7 +768,6 @@ class GridworldEnvironment(object):
         return self.gridworld.is_terminal(self.get_current_state())
 
 
-
 class Direction(object):
     """A class that contains the five actions available in Gridworlds.
 
@@ -780,13 +776,13 @@ class Direction(object):
     """
     NORTH = (0, -1)
     SOUTH = (0, 1)
-    EAST  = (1, 0)
-    WEST  = (-1, 0)
+    EAST = (1, 0)
+    WEST = (-1, 0)
     # This is hacky, but we do want to ensure that EXIT is distinct from the
     # other actions, and so we define it here instead of in an Action class.
     EXIT = 'exit'
     INDEX_TO_DIRECTION = [NORTH, SOUTH, EAST, WEST, EXIT]
-    DIRECTION_TO_INDEX = { a:i for i, a in enumerate(INDEX_TO_DIRECTION) }
+    DIRECTION_TO_INDEX = {a: i for i, a in enumerate(INDEX_TO_DIRECTION)}
     ALL_DIRECTIONS = INDEX_TO_DIRECTION
 
     @staticmethod

@@ -1,8 +1,7 @@
-import numpy as np
-import tensorflow as tf
 from itertools import product
 
-from gridworld import Direction
+import tensorflow as tf
+
 
 class Model(object):
     def __init__(self, feature_dim, gamma, query_size, discretization_size,
@@ -28,9 +27,9 @@ class Model(object):
             num_posneg_vals = (discretization_size // 2)
             const = 9 // num_posneg_vals
             f_range = range(-num_posneg_vals * const, 10, const)
-            print 'Using', f_range, 'to discretize the feature'
+            print('Using', f_range, 'to discretize the feature')
             if len(f_range) != discretization_size:
-                print 'discretization size is off by ' + str(len(f_range) - discretization_size)
+                print('discretization size is off by ' + str(len(f_range) - discretization_size))
             # proxy_space = np.random.randint(-4,3,size=[30 * query_size, query_size])
             self.proxy_reward_space = list(product(f_range, repeat=query_size))
             self.K = len(self.proxy_reward_space)
@@ -85,7 +84,7 @@ class Model(object):
     def build_continuous_weights(self):
         query_size, dim, K = self.query_size, self.feature_dim, self.K
         num_fixed = dim - query_size
-        self.query_weights= tf.constant(
+        self.query_weights = tf.constant(
             self.proxy_reward_space, dtype=tf.float32, name="query_weights")
 
         # if self.optimize:
@@ -118,7 +117,6 @@ class Model(object):
         self.name_to_op['weights'] = self.weights
         self.name_to_op['query_weights'] = self.query_weights
 
-
     def build_planner(self):
         raise NotImplemented('Should be implemented in subclass')
 
@@ -133,7 +131,6 @@ class Model(object):
             tf.float32, [true_reward_space_size, dim], name="true_reward_matrix")
         self.log_true_reward_matrix = tf.log(self.true_reward_matrix, name='log_true_reward_matrix')
 
-
         # TODO: Inefficient to recompute this matrix on every forward pass.
         # We can cache it and feed in true reward indeces instead of true_reward_matrix. The matrix multiplication has
         # size_proxy x size_true x feature_dim complexity. The other calculations in this map have a factor feature_dim
@@ -143,12 +140,11 @@ class Model(object):
 
         log_likelihoods_new = self.beta * self.avg_reward_matrix
 
-
         # Calculate posterior
         # self.prior = tf.placeholder(tf.float32, name="prior", shape=(true_reward_space_size))
         self.log_prior = tf.placeholder(tf.float32, name="log_prior", shape=(true_reward_space_size))
         log_Z_w = tf.reduce_logsumexp(log_likelihoods_new, axis=0, name='log_Z_w')
-        log_P_q_z = log_likelihoods_new - log_Z_w   # broadcasting
+        log_P_q_z = log_likelihoods_new - log_Z_w  # broadcasting
         # self.log_Z_q, max_a, max_b = logdot(log_P_q_z, tf.log(self.prior))
         self.log_Z_q = tf.reduce_logsumexp(log_P_q_z + self.log_prior, axis=1, name='log_Z_q', keep_dims=True)
         # TODO: For BALD objective, just take entropy of Z_q - prior expected entropy of q
@@ -157,7 +153,6 @@ class Model(object):
         self.posterior = tf.exp(self.log_posterior, name="posterior")
 
         self.post_sum_to_1 = tf.reduce_sum(tf.exp(self.log_posterior), axis=1, name='post_sum_to_1')
-
 
         # Get log likelihoods for actual true reward
         self.true_reward = tf.placeholder(
@@ -199,14 +194,14 @@ class Model(object):
         # Get true posterior_avg
         ## Not in log space
         self.post_weighted_true_reward_matrix = tf.multiply(self.true_posterior, tf.transpose(self.true_reward_matrix))
-        self.true_post_avg = tf.reduce_sum(self.post_weighted_true_reward_matrix, axis=1, name='post_avg', keep_dims=False)
+        self.true_post_avg = tf.reduce_sum(self.post_weighted_true_reward_matrix, axis=1, name='post_avg',
+                                           keep_dims=False)
 
         ## In log space (necessary?)
         # log_true_posterior_times_true_reward = self.true_log_posterior + tf.transpose(self.log_true_reward_matrix) # TODO: log true posteriors are log of negative
         # self.log_post_avg = tf.reduce_logsumexp(log_true_posterior_times_true_reward, axis=1, keep_dims=False)
         # self.name_to_op['log_post_avg'] = self.log_post_avg
         # self.post_avg = tf.exp(self.log_post_avg, name='post_avg')
-
 
         # Fill name to ops dict
         self.name_to_op['post_avg'] = self.true_post_avg
@@ -217,7 +212,6 @@ class Model(object):
         self.name_to_op['posterior'] = self.posterior
         self.name_to_op['log_posterior'] = self.log_posterior
         self.name_to_op['post_sum_to_1'] = self.post_sum_to_1
-
 
     def build_map_to_objective(self, objective):
         """
@@ -230,7 +224,6 @@ class Model(object):
             # self.exp_post_ent = tf.reduce_sum(
             #     tf.multiply(post_ent, tf.exp(self.log_Z_q)), axis=0, keep_dims=True, name='exp_post_entropy')
             # self.name_to_op['entropy'] = self.exp_post_ent
-
 
             # Calculate entropy as exp logsumexp (log p + log (-log p))
             scaled_log_posterior = self.log_posterior - 0.0001
@@ -273,10 +266,11 @@ class Model(object):
 
             self.total_variations = tf.reduce_sum(self.post_var, axis=-1, keep_dims=False)
             self.name_to_op['total_variations'] = self.total_variations
-            self.total_variations, self.log_Z_q = tf.reshape(self.total_variations, [-1]), tf.reshape(self.log_Z_q,[-1])
+            self.total_variations, self.log_Z_q = tf.reshape(self.total_variations, [-1]), tf.reshape(self.log_Z_q,
+                                                                                                      [-1])
             self.total_variation = tf.tensordot(
-                self.total_variations, tf.exp(self.log_Z_q), axes=[-1,-1] ,name='total_var')
-            self.total_variation = tf.reshape(self.total_variation, shape=[1,1,-1])
+                self.total_variations, tf.exp(self.log_Z_q), axes=[-1, -1], name='total_var')
+            self.total_variation = tf.reshape(self.total_variation, shape=[1, 1, -1])
             self.name_to_op['total_variation'] = self.total_variation
 
             if self.args.log_objective:
@@ -298,8 +292,8 @@ class Model(object):
             self.name_to_op['minimize'] = self.train_op
             self.name_to_op['lr_tensor'] = self.lr_tensor
 
-
-    def compute(self, outputs, sess, mdp, query=None, log_prior=None, weight_inits=None, feature_expectations_input=None,
+    def compute(self, outputs, sess, mdp, query=None, log_prior=None, weight_inits=None,
+                feature_expectations_input=None,
                 gradient_steps=0, gradient_logging_outputs=[], true_reward=None, true_reward_matrix=None, lr=None):
         """
         Takes gradient steps to set the non-query features to the values that
@@ -352,10 +346,9 @@ class Model(object):
             for step in range(gradient_steps):
                 results = sess.run(ops + other_ops, feed_dict=fd)
                 if ops and step % 1 == 0:
-                    print 'Gradient step {0}: {1}'.format(step, results[:-1])
+                    print('Gradient step {0}: {1}'.format(step, results[:-1]))
 
         return sess.run([get_op(name) for name in outputs], feed_dict=fd)
-
 
     def update_feed_dict_with_mdp(self, mdp, fd):
         raise NotImplemented('Should be implemented in subclass')
@@ -387,8 +380,8 @@ class BanditsModel(Model):
         self.name_to_op['features'] = self.features
 
         # Calculate state probabilities
-        weights_expand = tf.expand_dims(self.weights,axis=1)
-        intermediate_tensor = tf.multiply(tf.stack([self.features]*self.K,axis=0), weights_expand)
+        weights_expand = tf.expand_dims(self.weights, axis=1)
+        intermediate_tensor = tf.multiply(tf.stack([self.features] * self.K, axis=0), weights_expand)
         self.reward_per_state = tf.reduce_sum(intermediate_tensor, axis=-1, keep_dims=False, name="rewards_per_state")
         self.name_to_op['reward_per_state'] = self.reward_per_state
         self.name_to_op['q_values'] = self.reward_per_state
@@ -411,7 +404,6 @@ class BanditsModel(Model):
         features_stack = tf.multiply(tf.stack([self.features] * self.K, axis=0), probs_stack, name='multi')
         self.feature_expectations = tf.reduce_sum(features_stack, axis=1, keep_dims=False, name="feature_exps")
         self.name_to_op['feature_exps'] = self.feature_expectations
-
 
     def update_feed_dict_with_mdp(self, mdp, fd):
         fd[self.features] = mdp.convert_to_numpy_input()
@@ -465,16 +457,15 @@ class GridworldModel(Model):
             repeated_policy = tf.stack([policy] * dim, axis=-2)
             feature_expectations = tf.reduce_sum(
                 tf.multiply(repeated_policy, q_fes), axis=-1)
-            self.name_to_op['policy'+str(i)] = policy
-
+            self.name_to_op['policy' + str(i)] = policy
 
         # Remove the wall feature
-        self.feature_expectations_grid = feature_expectations[:,:,:,:-1]
+        self.feature_expectations_grid = feature_expectations[:, :, :, :-1]
         dim -= 1
         self.name_to_op['feature_exps_grid'] = self.feature_expectations_grid
 
         x, y = self.start_x, self.start_y
-        self.feature_expectations = self.feature_expectations_grid[:,y,x,:]
+        self.feature_expectations = self.feature_expectations_grid[:, y, x, :]
         self.name_to_op['feature_exps'] = self.feature_expectations
 
         q_fes = self.bellman_update(feature_expectations, features_wall)
@@ -488,13 +479,13 @@ class GridworldModel(Model):
         extra_row = tf.zeros((K, 1, width, dim))
         extra_col = tf.zeros((K, height, 1, dim))
 
-        north_lookahead = tf.concat([extra_row, fes[:,:-1]], axis=1)
+        north_lookahead = tf.concat([extra_row, fes[:, :-1]], axis=1)
         north_fes = features + gamma * north_lookahead
-        south_lookahead = tf.concat([fes[:,1:], extra_row], axis=1)
+        south_lookahead = tf.concat([fes[:, 1:], extra_row], axis=1)
         south_fes = features + gamma * south_lookahead
-        east_lookahead = tf.concat([fes[:,:,1:], extra_col], axis=2)
+        east_lookahead = tf.concat([fes[:, :, 1:], extra_col], axis=2)
         east_fes = features + gamma * east_lookahead
-        west_lookahead = tf.concat([extra_col, fes[:,:,:-1]], axis=2)
+        west_lookahead = tf.concat([extra_col, fes[:, :, :-1]], axis=2)
         west_fes = features + gamma * west_lookahead
         return tf.stack([north_fes, south_fes, east_fes, west_fes], axis=-1)
 

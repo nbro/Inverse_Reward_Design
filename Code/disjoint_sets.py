@@ -7,7 +7,7 @@ class DisjointSets(object):
     def __init__(self, elements):
         self.num_elements = len(elements)
         self.num_sets = len(elements)
-        self.parents = { element : element for element in elements }
+        self.parents = {element: element for element in elements}
 
     def is_connected(self):
         return self.num_sets == 1

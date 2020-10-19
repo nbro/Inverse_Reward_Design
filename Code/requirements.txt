@@ -1,0 +1,5 @@
+numpy
+scipy
+tensorflow==1.15
+matplotlib
+seaborn

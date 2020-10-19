@@ -1,7 +1,8 @@
+import random
 import unittest
 
-from gridworld import GridworldMdp, GridworldEnvironment, Direction
-import random
+from gridworld import Direction, GridworldEnvironment, GridworldMdp
+
 
 class TestDirection(unittest.TestCase):
     def test_direction_number_conversion(self):
@@ -19,6 +20,7 @@ class TestDirection(unittest.TestCase):
         self.assertEqual(len(set(all_directions)), num_directions)
         # Check that the numbers are 0, 1, ... num_directions - 1
         self.assertEqual(set(all_numbers), set(range(num_directions)))
+
 
 class TestGridworld(unittest.TestCase):
     def setUp(self):
@@ -202,6 +204,7 @@ class TestGridworld(unittest.TestCase):
 
     def dfs(self, grid):
         visited = set()
+
         def helper(state):
             if state in visited:
                 return
@@ -252,6 +255,7 @@ class TestGridworld(unittest.TestCase):
         self.assertEqual(mdp_string.count(' '), 34)
         self.assertEqual(mdp_string.count('A'), 1)
         self.assertEqual(mdp_string.count('3'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

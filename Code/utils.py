@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Distribution(object):
     """Represents a probability distribution.
 
@@ -7,6 +8,7 @@ class Distribution(object):
     their probabilities. The distribution is always normalized (so that the
     probabilities sum to 1).
     """
+
     def __init__(self, probability_mapping):
         Z = float(sum(probability_mapping.values()))
         # Convert to a list so that we aren't iterating over the dictionary and
@@ -51,5 +53,3 @@ class Distribution(object):
 
     def __repr__(self):
         return 'Distribution(%s)' % repr(self.dist)
-
-

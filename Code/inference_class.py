@@ -25,7 +25,7 @@ class Inference(object):
             self.log_prior = true_log_posterior
             self.prior = np.exp(true_log_posterior)
         # TODO(rohinmshah): Can the elif case be removed? (soerenmind): It would break if query is None
-        elif len(query) == 0: # Do nothing for empty query
+        elif len(query) == 0:  # Do nothing for empty query
             return
         else:
             raise ValueError('inference.get_full_posterior shouldnt be used')

@@ -1,17 +1,18 @@
-
 print('importing')
 import argparse
+import collections
 import csv
 import os
 import re
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
 # from seaborn import set, set_style
 import numpy as np
-import collections
+import seaborn as sns
 
 print('importing done')
+
 
 class Experiment(object):
     def __init__(self, params, means_data, sterrs_data):
@@ -22,19 +23,25 @@ class Experiment(object):
     def __str__(self):
         return 'Experiment: ' + str(self.params)
 
+
 def maybe_num(x):
     """Converts string x to an int if possible, otherwise a float if possible,
     otherwise returns it unchanged."""
-    try: return int(x)
+    try:
+        return int(x)
     except ValueError:
-        try: return float(x)
-        except ValueError: return x
+        try:
+            return float(x)
+        except ValueError:
+            return x
+
 
 def concat(folder, element):
     """folder and element are strings"""
     if folder[-1] == '/':
         return folder + element
     return folder + '/' + element
+
 
 def get_param_vals(folder_name):
     """Gets the parameter values of the experiment from its folder name.
@@ -47,8 +54,9 @@ def get_param_vals(folder_name):
     """
     key_vals = re.finditer(r"([^-]+)=([^-]+)", folder_name)
     result_tuple = tuple(((m.group(1), maybe_num(m.group(2))) for m in key_vals))
-    result_dict = { k:v for k, v in result_tuple }
+    result_dict = {k: v for k, v in result_tuple}
     return result_tuple, result_dict
+
 
 def load_experiment_file(filename):
     """Loads the data from <filename>, which should be an all choosers CSV.
@@ -61,11 +69,12 @@ def load_experiment_file(filename):
         chooser = csvfile.readline().strip().strip(',')
         reader = csv.DictReader(csvfile)
         first_row = next(reader)
-        data = { k:[maybe_num(v)] for k, v in first_row.items() }
+        data = {k: [maybe_num(v)] for k, v in first_row.items()}
         for row in reader:
             for k, v in row.items():
                 data[k].append(maybe_num(v))
     return chooser, data
+
 
 def load_experiment(folder):
     """Loads the data from <folder>, specifically from all choosers-means-.csv
@@ -82,6 +91,7 @@ def load_experiment(folder):
         concat(folder, 'all choosers-sterr-.csv'))
     assert means_chooser == sterrs_chooser
     return means_chooser, means_data, sterrs_data
+
 
 def simplify_keys(experiments):
     """Identifies experiment parameters that are constant across the dataset and
@@ -109,6 +119,7 @@ def simplify_keys(experiments):
         def find_value(flag_name):
             values = [value for name, value in key if name == flag_name]
             return values[0] if values else None
+
         return tuple([(name, find_value(name)) for name in all_names])
 
     keys = [extend_key(key) for key in keys]
@@ -132,6 +143,7 @@ def simplify_keys(experiments):
     controls = dict([(keys[0][index][0], default_values[keys[0][index][0]]) for index in indices_with_no_variation])
     return new_experiments, controls
 
+
 def fix_special_cases(experiments):
     """Does postprocessing to handle any special cases.
 
@@ -144,6 +156,7 @@ def fix_special_cases(experiments):
     """
     query_sizes = set([exp.params['qsize'] for exp in experiments.values()])
     full_exps = [(key, exp) for key, exp in experiments.items() if exp.params['choosers'] == 'full']
+
     def replace(key_tuple, var, val):
         return tuple(((k, (val if k == var else v)) for k, v in key_tuple))
 
@@ -155,6 +168,7 @@ def fix_special_cases(experiments):
                 new_params['qsize'] = qsize
                 experiments[new_key] = Experiment(
                     new_params, exp.means_data, exp.sterrs_data)
+
 
 def load_data(folder):
     """Loads all experiment data from data/<folder>.
@@ -188,7 +202,6 @@ def load_data(folder):
     return experiments, changing_vars, control_var_vals
 
 
-
 def get_matching_experiments(experiments, params_to_match):
     """Returns a list of Experiments whose param values match the bindings in
     params_to_match.
@@ -204,6 +217,7 @@ def get_matching_experiments(experiments, params_to_match):
             continue
         result.append(exp)
     return result
+
 
 def graph_all(experiments, all_vars, x_var, dependent_vars, independent_vars,
               controls, extra_experiment_params, folder, args):
@@ -257,11 +271,12 @@ def graph_all(experiments, all_vars, x_var, dependent_vars, independent_vars,
         for key, exps in graphs_data.items():
             bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, key, folder, args)
 
+
 def bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, other_vals, folder, args):
     set_style()
     num_columns = 2 if args.double_envs else 1
     fig, axes = plt.subplots(1, num_columns, sharex=True)
-    sns.set_context(rc={'lines.markeredgewidth': 1.0})   # Thickness or error bars
+    sns.set_context(rc={'lines.markeredgewidth': 1.0})  # Thickness or error bars
     # capsize = 0.    # length of horizontal line on error bars
     [y_var] = dependent_vars
     x_data = []
@@ -279,7 +294,7 @@ def bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, oth
             label = 'Discrete queries'
         elif params['choosers'] == 'feature_entropy_search_then_optim':
             x_pos = [None, 5., 6., 7.][qsize]
-            x_pos +=  - 0.35
+            x_pos += - 0.35
             color = 'lightblue'
             label = 'Feature queries'
         else:
@@ -296,13 +311,12 @@ def bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, oth
 
         means = experiment.means_data
         num_iter = len(means[y_var])
-        cum_regret = means[y_var][num_iter-1]
+        cum_regret = means[y_var][num_iter - 1]
 
         x_pos, color, label = params_to_x_pos_and_color_and_label(params)
         if x_pos is not None:
             ax.bar([x_pos], [cum_regret], yerr=[1], color=color, label=label)
             labels.append(label)
-
 
         # shift = -0.175
         # plt.xticks([0.0 + shift + 0.5*barwidth, 1.125 + shift + barwidth, 1.125 + shift + 2*barwidth, 1.125 + shift + 3*barwidth,
@@ -324,36 +338,35 @@ def bar_graph_qsize(exps, x_var, dependent_vars, independent_vars, controls, oth
     ax_top = get_ax(axes, 0, 1, num_columns, col)
     ax_top.set_title(title, fontsize=17, fontweight='normal')
 
-
     'Make legend'
     try:
         ax = axes[-1][-1]
     except TypeError:
-        try: ax = axes[-1]
+        try:
+            ax = axes[-1]
         except TypeError:
             ax = axes
     # for ax in flatten(axes):
     plt.sca(ax)
     handles, labels = ax.get_legend_handles_labels()
     # try: legend_order = sorted([int(label) for label in labels])
-    legend_order = [2,3,0,1]   # for outperform_IRD
+    legend_order = [2, 3, 0, 1]  # for outperform_IRD
     # legend_order = range(len(labels))   # for discrete
     # legend_order = [1,0,2]  # for continuous
-    hl = sorted(zip(handles, labels, legend_order),    # Sorts legend by putting labels 0:k to place as specified
-           key=lambda elem: elem[2])
+    hl = sorted(zip(handles, labels, legend_order),  # Sorts legend by putting labels 0:k to place as specified
+                key=lambda elem: elem[2])
     hl = [[handle, label] for handle, label, idx in hl]
     try:
         handles2, labels2 = zip(*hl)
     except ValueError:
         handles2, labels2 = [], []
-        print Warning('Warning: Possibly data only exists for one environment')
+        print(Warning('Warning: Possibly data only exists for one environment'))
 
     # ax.legend(handles2, labels2, fontsize=10)
     plt.legend(handles2, labels2, fontsize=13)
 
-
     'Change global layout'
-    sns.despine(fig)    # Removes top and right graph edges
+    sns.despine(fig)  # Removes top and right graph edges
     plt.suptitle('Number of queries asked', y=0.0, x=0.52, fontsize=17, verticalalignment='bottom')
     fig.subplots_adjust(left=0.09, right=.96, top=0.92, bottom=0.12)
     # plt.tight_layout(w_pad=0.02, rect=[0, 0.03, 1, 0.95])  # w_pad adds horizontal space between graphs
@@ -389,8 +402,8 @@ def graph(exps, x_var, dependent_vars, independent_vars, controls,
     num_rows = len(dependent_vars)
     num_columns = 2 if args.double_envs else 1
     fig, axes = plt.subplots(num_rows, num_columns, sharex=True)
-    sns.set_context(rc={'lines.markeredgewidth': 1.0})   # Thickness or error bars
-    capsize = 0.    # length of horizontal line on error bars
+    sns.set_context(rc={'lines.markeredgewidth': 1.0})  # Thickness or error bars
+    capsize = 0.  # length of horizontal line on error bars
     spacing = 100.0
 
     # Draw all lines and labels
@@ -408,21 +421,21 @@ def graph(exps, x_var, dependent_vars, independent_vars, controls,
             i_var_val = ', '.join([str(params[k]) for k in independent_vars])
             # if 'full' in i_var_val:
             #     means, sterrs = constant_data_full_IRD(means, sterrs, y_var)
-            label = i_var_to_label(i_var_val) + (', '+ str(params['qsize'])) * args.compare_qsizes # name in legend
+            label = i_var_to_label(i_var_val) + (', ' + str(params['qsize'])) * args.compare_qsizes  # name in legend
             color = chooser_to_color(i_var_val, args, params)
             x_data = np.array(means[x_var]) + 1
 
             try:
                 ax.errorbar(x_data, means[y_var], yerr=sterrs[y_var], color=color,
-                         capsize=capsize, capthick=1, label=label)#,
-                         # marker='o', markerfacecolor='white', markeredgecolor=chooser_to_color(chooser),
-                         # markersize=4)
+                            capsize=capsize, capthick=1, label=label)  # ,
+                # marker='o', markerfacecolor='white', markeredgecolor=chooser_to_color(chooser),
+                # markersize=4)
             except:
                 pass
 
             labels.append(label)
 
-            ax.set_xlim([0,21])
+            ax.set_xlim([0, 21])
             # ylim = ax.get_ylim()
             # ax.set_ylim(ylim)  #-0.15)
 
@@ -436,36 +449,35 @@ def graph(exps, x_var, dependent_vars, independent_vars, controls,
             ax_top = get_ax(axes, 0, num_rows, num_columns, col)
             ax_top.set_title(title, fontsize=17, fontweight='normal')
 
-
     'Make legend'
     try:
         ax = axes[-1][-1]
     except TypeError:
-        try: ax = axes[-1]
+        try:
+            ax = axes[-1]
         except TypeError:
             ax = axes
     # for ax in flatten(axes):
     plt.sca(ax)
     handles, labels = ax.get_legend_handles_labels()
     # try: legend_order = sorted([int(label) for label in labels])
-    legend_order = [2,3,0,1]   # for outperform_IRD
+    legend_order = [2, 3, 0, 1]  # for outperform_IRD
     # legend_order = range(len(labels))   # for discrete
     # legend_order = [1,0,2]  # for continuous
-    hl = sorted(zip(handles, labels, legend_order),    # Sorts legend by putting labels 0:k to place as specified
-           key=lambda elem: elem[2])
+    hl = sorted(zip(handles, labels, legend_order),  # Sorts legend by putting labels 0:k to place as specified
+                key=lambda elem: elem[2])
     hl = [[handle, label] for handle, label, idx in hl]
     try:
         handles2, labels2 = zip(*hl)
     except ValueError:
         handles2, labels2 = [], []
-        print Warning('Warning: Possibly data only exists for one environment')
+        print(Warning('Warning: Possibly data only exists for one environment'))
 
     # ax.legend(handles2, labels2, fontsize=10)
     plt.legend(handles2, labels2, fontsize=13)
 
-
     'Change global layout'
-    sns.despine(fig)    # Removes top and right graph edges
+    sns.despine(fig)  # Removes top and right graph edges
     plt.suptitle('Number of queries asked', y=0.0, x=0.52, fontsize=17, verticalalignment='bottom')
     fig.subplots_adjust(left=0.09, right=.96, top=0.92, bottom=0.12)
     # plt.tight_layout(w_pad=0.02, rect=[0, 0.03, 1, 0.95])  # w_pad adds horizontal space between graphs
@@ -495,9 +507,6 @@ def flatten(l):
             yield el
 
 
-
-
-
 def get_ax(axes, row, num_rows, num_columns, col):
     onecol = num_columns == 1
     onerow = num_rows == 1
@@ -525,6 +534,7 @@ def get_title(axnum):
     else:
         return str(axnum)
 
+
 def create_legend(ax):
     lines = [
         ('nominal', {'color': '#f79646', 'linestyle': 'solid'}),
@@ -538,28 +548,27 @@ def create_legend(ax):
         return mpl.lines.Line2D([], [], **kwds)
 
     ax.legend([create_dummy_line(**l[1]) for l in lines],
-    [l[0] for l in lines],
-    loc='upper right',
-    ncol=1,
-    fontsize=10,
-    bbox_to_anchor=(1.1, 1.0))  # adjust horizontal and vertical legend position
-
+              [l[0] for l in lines],
+              loc='upper right',
+              ncol=1,
+              fontsize=10,
+              bbox_to_anchor=(1.1, 1.0))  # adjust horizontal and vertical legend position
 
 
 def set_style():
     mpl.rcParams['text.usetex'] = True
     mpl.rc('font', family='serif', serif=['Palatino'])  # Makes font thinner
 
-    sns.set(font='serif', font_scale=1.4)   # Change font size of (sub) title and legend. Serif seems to have no effect.
+    sns.set(font='serif', font_scale=1.4)  # Change font size of (sub) title and legend. Serif seems to have no effect.
 
     # Make the background a dark grid, and specify the
     # specific font family
-    sns.set_style("white", {     # Font settings have no effect
+    sns.set_style("white", {  # Font settings have no effect
         "font.family": "serif",
         "font.weight": "normal",
         "font.serif": ["Times", "Palatino", "serif"]})
-        # 'axes.facecolor': 'darkgrid'})
-        # 'lines.markeredgewidth': 1})
+    # 'axes.facecolor': 'darkgrid'})
+    # 'lines.markeredgewidth': 1})
 
 
 def plot_sig_line(ax, x1, x2, y1, h, padding=0.3):
@@ -568,7 +577,7 @@ def plot_sig_line(ax, x1, x2, y1, h, padding=0.3):
     Only need one y coordinate (y1) since the bracket is parallel to the x-axis.
     '''
     ax.plot([x1, x1, x2, x2], [y1, y1 + h, y1 + h, y1], linewidth=1, color='k')
-    ax.text(0.5*(x1 + x2), y1 + h + padding * h, '*', color='k', fontsize=16, fontweight='normal')
+    ax.text(0.5 * (x1 + x2), y1 + h + padding * h, '*', color='k', fontsize=16, fontweight='normal')
 
 
 def var_to_label(varname):
@@ -591,11 +600,10 @@ def var_to_label(varname):
 
 
 def chooser_to_color(chooser, args, params):
-    greedy_color = 'darkorange' #'lightblue'
-    exhaustive_color = 'crimson' # 'peachpuff', 'crimson'
-    random_color = 'darkgrey' # 'darkorange'
-    full_color = 'lightgrey' # 'grey'
-
+    greedy_color = 'darkorange'  # 'lightblue'
+    exhaustive_color = 'crimson'  # 'peachpuff', 'crimson'
+    random_color = 'darkgrey'  # 'darkorange'
+    full_color = 'lightgrey'  # 'grey'
 
     # Colors to distinguish optimizers
     # feature_color = 'blue'
@@ -604,7 +612,7 @@ def chooser_to_color(chooser, args, params):
     # both_color = 'steelblue'
 
     # Colors to only distinguish optimized vs not optimized
-    optimized_color = 'lightblue'#0066FF' # blue
+    optimized_color = 'lightblue'  # 0066FF' # blue
     feature_color = optimized_color
     feature_color_random = 'forestgreen'
     search_color = optimized_color
@@ -671,8 +679,8 @@ def chooser_to_color(chooser, args, params):
     # if chooser == 'Feature selection, random init':
     #     return 'darkorange'
 
-def i_var_to_label(i_var):
 
+def i_var_to_label(i_var):
     # Discrete choosers
     if i_var in ['greedy_entropy_discrete_tf', 'greedy_discrete']:
         return 'Greedy'
@@ -707,6 +715,7 @@ def i_var_to_label(i_var):
     else:
         return i_var
 
+
 def constant_data_full_IRD(means, sterrs, y_var):
     full_mean, full_std, num_iter = means[y_var][1], sterrs[y_var][1], len(means[y_var])
     means[y_var] = [full_mean for _ in range(num_iter)]
@@ -730,9 +739,11 @@ def parse_args():
     # parser.add_argument('-choosers', '--cho', action='append', default=[])
     return parser.parse_args()
 
+
 def parse_kv_pairs(lst):
     result = [kv_pair.split('=') for kv_pair in lst]
     return [(k, maybe_num(v)) for k, v in result]
+
 
 if __name__ == '__main__':
     args = parse_args()
